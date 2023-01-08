@@ -15,13 +15,14 @@ func init() {
 	if err != nil {
 		os.Exit(1)
 	}
-	go choose()
 }
 
 func main() {
 	r := gin.Default()
-	r.GET("getToken", GetTokenHandler)
-	r.GET("choose", chooseHandler)
+	r.GET("getToken", GetTokenHandler())
+	for _, name := range config.Names {
+		r.GET("choose_"+name.NickName, chooseHandler(SelectedStuMap{}, name))
+	}
 	err := r.Run(config.Addr)
 	if err != nil {
 		log.Println("start server fail!")

@@ -1,6 +1,17 @@
 {
   "Addr": "0.0.0.0:80",
   "StartTime": "2019-10-12T14:20:50.52+08:00",
-  "MaxNum": 20,
-  "TokenKey": "rando"
+  "MaxNum": 3,
+  "TokenKey": "random",
+  "RosterFile": "roster.txt",
+  "ServerURL": "http://localhost",
+  "Names": [
+    {
+    "Name": "",
+    "NickName": "",
+    "FeishuURL": "",
+    "SpecialWords": ""
+    }
+  ]
+
 }

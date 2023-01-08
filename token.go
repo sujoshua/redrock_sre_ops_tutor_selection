@@ -1,11 +1,16 @@
 package main
 
 import (
+	"bufio"
 	"errors"
+	"fmt"
 	"github.com/dgrijalva/jwt-go"
 	"github.com/gin-gonic/gin"
+	"io"
 	"log"
+	"os"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -20,7 +25,41 @@ type UserInfo struct {
 	QQ   string
 }
 
-func GetTokenHandler(c *gin.Context) {
+// roster 允许获取token的学员
+var roster map[string]struct{}
+
+// 选择对应导师对应的接口信息
+var urlInfo string
+
+func GetTokenHandler() func(c *gin.Context) {
+	roster = make(map[string]struct{})
+	// 解析学员名单，之后放入roster的map中
+	f, err := os.Open(config.RosterFile)
+	if err != nil {
+		log.Panicf("parese roster file failed! err: %s", err.Error())
+	}
+	r := bufio.NewReader(f)
+
+	for {
+		line, err := r.ReadString('\n')
+		if err != nil && err != io.EOF {
+			log.Printf("read roaster string fail, err: %s", err.Error())
+		}
+		roster[strings.TrimSpace(line)] = struct{}{}
+		if err == io.EOF {
+			break
+		}
+	}
+
+	// 生成导师对应的接口
+	for _, name := range config.Names {
+		urlInfo += fmt.Sprintf("\n%s：%s", name.Name, config.serverURL.JoinPath("choose_"+name.NickName).String())
+	}
+	return getTokenHandler
+}
+
+// 返回token
+func getTokenHandler(c *gin.Context) {
 	if time.Now().Unix()-config.startTime < 0 {
 		c.String(401, "禁止抢跑！")
 		return
@@ -35,6 +74,14 @@ func GetTokenHandler(c *gin.Context) {
 			return
 		}
 	}
+
+	// 判断有无资格
+	if _, ok := roster[id[0]]; !ok {
+		log.Printf("未发现学号：%s, 有考核资格！", id[0])
+		c.String(401, "根据你提供的学号信息，未发现你有考核资格哦！如有疑问，请私聊学长！")
+		return
+	}
+
 	idInt, err := strconv.Atoi(id[0])
 	if err != nil {
 		log.Printf("输入ID: %s, 非法", id[0])
@@ -67,8 +114,8 @@ func GetTokenHandler(c *gin.Context) {
 		c.String(500, "系统好像出现错误啦，不能预期的生成token（恼")
 		return
 	}
-	c.String(200, token)
 
+	c.String(200, token+"\n"+urlInfo)
 }
 
 // generate token with the info
@@ -81,6 +128,7 @@ func generateToken(info UserInfo) (string, error) {
 	return token, err
 }
 
+// 解析token
 func parseToken(tokenStr string) (info UserInfo, err error) {
 	tokenClaims, err := jwt.ParseWithClaims(tokenStr, &TokenClaims{}, func(token *jwt.Token) (interface{}, error) {
 		return config.tokenKey, nil
